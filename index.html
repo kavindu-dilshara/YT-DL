@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube MP3 Downloader</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+            text-align: center;
+        }
+        #videoContainer {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+        #videoThumbnail {
+            max-width: 100%;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        #videoTitle {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        #videoDetails {
+            color: #666;
+            margin-bottom: 15px;
+        }
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            box-sizing: border-box;
+        }
+        #downloadBtn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            display: none;
+        }
+        #downloadBtn:hover {
+            background-color: #45a049;
+        }
+        #status {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>YouTube MP3 Downloader</h1>
+    
+    <form id="urlForm">
+        <input 
+            type="text" 
+            id="videoUrl" 
+            placeholder="Enter YouTube Video URL" 
+            required
+        >
+        <button type="submit">Load Video</button>
+    </form>
+
+    <div id="videoContainer">
+        <img id="videoThumbnail" alt="Video Thumbnail">
+        <div id="videoTitle"></div>
+        <div id="videoDetails"></div>
+        <button id="downloadBtn">Download MP3</button>
+    </div>
+
+    <div id="status"></div>
+
+    <script>
+        const urlForm = document.getElementById('urlForm');
+        const videoUrl = document.getElementById('videoUrl');
+        const videoContainer = document.getElementById('videoContainer');
+        const videoThumbnail = document.getElementById('videoThumbnail');
+        const videoTitle = document.getElementById('videoTitle');
+        const videoDetails = document.getElementById('videoDetails');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const statusDiv = document.getElementById('status');
+
+        // Reset UI
+        function resetUI() {
+            videoContainer.style.display = 'none';
+            downloadBtn.style.display = 'none';
+            statusDiv.textContent = '';
+            statusDiv.className = '';
+        }
+
+        // Form submission to load video info
+        urlForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            resetUI();
+            
+            const url = videoUrl.value.trim();
+            statusDiv.textContent = 'Loading video information...';
+            statusDiv.className = '';
+
+            try {
+                const response = await fetch(`/video-info?url=${encodeURIComponent(url)}`);
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to load video information');
+                }
+
+                const videoInfo = await response.json();
+
+                // Update UI with video information
+                videoThumbnail.src = videoInfo.thumbnail;
+                videoTitle.textContent = videoInfo.title;
+                videoDetails.textContent = `Duration: ${formatDuration(videoInfo.duration)} | Artist: ${videoInfo.author}`;
+                
+                videoContainer.style.display = 'block';
+                downloadBtn.style.display = 'block';
+                statusDiv.textContent = 'Video loaded successfully!';
+                statusDiv.className = 'success';
+
+                // Store video URL for download
+                downloadBtn.onclick = () => downloadVideo(url);
+
+            } catch (error) {
+                statusDiv.textContent = `Error: ${error.message}`;
+                statusDiv.className = 'error';
+                console.error('Video info error:', error);
+            }
+        });
+
+        // Download video function
+        async function downloadVideo(url) {
+            statusDiv.textContent = 'Preparing download...';
+            statusDiv.className = '';
+
+            try {
+                const response = await fetch(`/download?url=${encodeURIComponent(url)}`);
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Download failed');
+                }
+
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = downloadUrl;
+                
+                // Use video title as filename
+                a.download = `${videoTitle.textContent}.mp3`.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(downloadUrl);
+
+                statusDiv.textContent = 'Download completed!';
+                statusDiv.className = 'success';
+
+            } catch (error) {
+                statusDiv.textContent = `Download Error: ${error.message}`;
+                statusDiv.className = 'error';
+                console.error('Download error:', error);
+            }
+        }
+
+        // Helper function to format duration
+        function formatDuration(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+    </script>
+</body>
+</html>
